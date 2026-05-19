@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const _supabase = window.supabase.createClient(
+    'https://lvsydywdomysjutkkrva.supabase.co',
+    'sb_publishable_Qa1tNOpl35ll6H_yGHeBGQ_YwwbNt2H'
+  );
+</script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>FitForge — Train Smarter. Push Harder.</title>
@@ -1711,16 +1718,40 @@ nav a.active{color:var(--red)}
 </div>
 
 <script>
-/* ═══════════════ STORAGE ═══════════════ */
-const USERS_KEY   = 'fitforge_users';
-const SESSION_KEY = 'fitforge_session';
-const LOG_KEY     = 'fitforge_logs_';
-const getUsers    = () => JSON.parse(localStorage.getItem(USERS_KEY)  || '{}');
-const saveUsers   = u  => localStorage.setItem(USERS_KEY,  JSON.stringify(u));
-const getSession  = () => JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-const saveSession = s  => localStorage.setItem(SESSION_KEY, JSON.stringify(s));
-const getLogs     = e  => JSON.parse(localStorage.getItem(LOG_KEY + e) || '[]');
-const saveLogs    = (e,l) => localStorage.setItem(LOG_KEY + e, JSON.stringify(l));
+/* ═══════════════ STORAGE — SUPABASE ═══════════════ */
+const sb = _supabase;
+let _currentUser = null;
+let _profile = null;
+let _logs = [];
+
+function getSession(){ return _currentUser ? { email: _currentUser.email, user: _currentUser } : null; }
+function getUsers(){
+  if(!_currentUser || !_profile) return {};
+  return { [_currentUser.email]: { name:_profile.name||'', email:_currentUser.email, bio:_profile.bio||'', avatar:_profile.avatar||'av1', goal:_profile.goal||4, cal:_profile.cal||2000, level:_profile.level||'Beginner', joined:new Date(_profile.joined_at||Date.now()).getTime(), enrolledAt:_profile.enrolledAt||{}, program:_profile.program||'', enrolledPrograms:_profile.enrolledPrograms||[] }};
+}
+async function saveUsers(usersObj){
+  if(!_currentUser) return;
+  const u = usersObj[_currentUser.email]; if(!u) return;
+  _profile = {..._profile, ...u};
+  await sb.from('profiles').update({ name:u.name, bio:u.bio, avatar:u.avatar, goal:u.goal, cal:u.cal, level:u.level, enrolledAt:u.enrolledAt||{}, program:u.program||'', enrolledPrograms:u.enrolledPrograms||[] }).eq('id', _currentUser.id);
+}
+function getLogs(email){ return _logs; }
+async function saveLogs(email, logsArray){
+  if(!_currentUser) return;
+  _logs = logsArray;
+  await sb.from('logs').delete().eq('user_id', _currentUser.id);
+  if(!logsArray.length) return;
+  await sb.from('logs').insert(logsArray.map(l=>({ user_id:_currentUser.id, ts:l.ts, program_name:l.program||'', workout_title:l.title||'', calories:l.calories||0, mood:l.mood||'', notes:l.notes||'', exercises:l.exercises||[], duration:l.duration||0, rest_day:l.restDay||false, skipped:l.skipped||false, auto_fail:l.autoFail||false, completion_pct:l.completionPct||0 })));
+}
+async function loadUserData(user){
+  _currentUser = user;
+  let { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  if(!profile){ const { data: np } = await sb.from('profiles').insert({ id:user.id, name:user.user_metadata?.name||user.email.split('@')[0] }).select().single(); profile = np; }
+  _profile = profile || { id:user.id, name:'', enrolledPrograms:[], enrolledAt:{}, program:'' };
+  const { data: logsData } = await sb.from('logs').select('*').eq('user_id', user.id).order('ts', { ascending:true });
+  _logs = (logsData||[]).map(l=>({ ts:l.ts, program:l.program_name, title:l.workout_title, calories:l.calories, mood:l.mood, notes:l.notes, exercises:l.exercises||[], duration:l.duration, restDay:l.rest_day, skipped:l.skipped, autoFail:l.auto_fail, completionPct:l.completion_pct }));
+}
+const saveSession = s => {};
 
 /* ═══════════════ PASSWORD TOGGLE ═══════════════ */
 function togglePw(inputId, btn){
@@ -1817,12 +1848,12 @@ function handleAvatarUpload(e){
   if(!file.type.startsWith('image/')) return showToast('Please upload an image file.');
   if(file.size>2*1024*1024) return showToast('Image too large. Max 2MB.');
   const reader=new FileReader();
-  reader.onload=function(ev){
+  reader.onload=async function(ev){
     const session=getSession();
     if(!session) return;
     const users=getUsers();
     users[session.email].avatar=ev.target.result;
-    saveUsers(users);
+    await saveUsers(users);
     updateNavState();
     renderAccountPage();
     showToast('Profile photo updated!');
@@ -1877,7 +1908,7 @@ function selectSbAvatar(el){
   // Live preview inside sidebar only (not saved yet)
   document.getElementById('sbAvatar').innerHTML=getAvatarHTML(sbSelectedAvatar);
 }
-function saveSbProfile(){
+async function saveSbProfile(){
   const session=getSession(); if(!session) return;
   const users=getUsers(); const u=users[session.email];
   const name=document.getElementById('sbEditName').value.trim();
@@ -1886,7 +1917,7 @@ function saveSbProfile(){
   err.style.display='none';
   if(!name){err.textContent='Name cannot be empty.';err.style.display='block';return;}
   u.name=name; u.bio=bio; u.avatar=sbSelectedAvatar;
-  users[session.email]=u; saveUsers(users);
+  users[session.email]=u; await saveUsers(users);
   updateNavState(); showToast('Profile updated! ✓');
 }
 
@@ -1935,43 +1966,42 @@ function showError(id,msg){
   const el=document.getElementById(id);
   if(el){el.textContent=msg;el.style.display='block';}
 }
-function doLogin(){
+async function doLogin(){
   const email=document.getElementById('l-email').value.trim().toLowerCase();
   const pass=document.getElementById('l-pass').value;
   if(!email||!pass)return showError('loginErr','Please fill in all fields.');
-  const users=getUsers();
-  if(!users[email])return showError('loginErr','No account found with that email.');
-  if(users[email].password!==btoa(pass))return showError('loginErr','Incorrect password.');
-  loginUser(email); closeAuth();
-  const u=getUsers()[email];
-  if(!(u.enrolledPrograms&&u.enrolledPrograms.length>0)){
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error)return showError('loginErr',error.message);
+  await loadUserData(data.user);
+  closeAuth(); updateNavState(); render();
+  if(!(_profile.enrolledPrograms&&_profile.enrolledPrograms.length>0)){
     setTimeout(()=>showToast('Head to Programs to pick your first program!'),300);
   }
+  if(_authCb){_authCb();_authCb=null;}
 }
-function doSignup(){
+async function doSignup(){
   const name=document.getElementById('s-name').value.trim();
   const email=document.getElementById('s-email').value.trim().toLowerCase();
   const pass=document.getElementById('s-pass').value;
   if(!name||!email||!pass)return showError('signupErr','Please fill in all fields.');
   if(pass.length<6)return showError('signupErr','Password must be at least 6 characters.');
-  // Stricter email validation — requires TLD of at least 2 chars
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))return showError('signupErr','Enter a valid email address.');
-  const users=getUsers();
-  if(users[email])return showError('signupErr','An account with that email already exists.');
-  users[email]={name,email,password:btoa(pass),program:'',enrolledPrograms:[],goal:4,cal:2000,avatar:'av1',joined:Date.now(),enrolledAt:{}};
-  saveUsers(users); loginUser(email); closeAuth();
+  const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{name}}});
+  if(error)return showError('signupErr',error.message);
+  await loadUserData(data.user);
+  closeAuth(); updateNavState(); render();
   showToast('Welcome to FitForge, '+name+'!');
   setTimeout(()=>showToast('Head to Programs to pick your first program!'),2000);
+  if(_authCb){_authCb();_authCb=null;}
 }
-function doLogout(){
-  saveSession(null); updateNavState(); render(); renderHomeFolders(); renderTodaysWorkoutCard();
+async function doLogout(){
+  await sb.auth.signOut();
+  _currentUser=null; _profile=null; _logs=[];
+  updateNavState(); render(); renderHomeFolders(); renderTodaysWorkoutCard();
   navigateTo('home');
   showToast('You have been logged out.');
 }
-function loginUser(email){
-  saveSession({email}); updateNavState(); render();
-  if(_authCb){_authCb();_authCb=null;}
-}
+function loginUser(email){ updateNavState(); render(); if(_authCb){_authCb();_authCb=null;} }
 
 /* ═══════════════ NAV STATE ═══════════════ */
 function updateNavState(){
@@ -2405,7 +2435,7 @@ function refreshProgModalButtons(){
 }
 function closeProgModal(){document.getElementById('progOverlay').classList.remove('open');}
 document.getElementById('progOverlay').onclick=e=>{if(e.target===document.getElementById('progOverlay'))closeProgModal();};
-function enrollProgram(){
+async function enrollProgram(){
   const session=getSession();
   if(!session){closeProgModal();openAuth('signup');return;}
   const users=getUsers();const u=users[session.email];
@@ -2422,7 +2452,7 @@ function enrollProgram(){
   u.program=currentProgName;
   if(!u.enrolledAt) u.enrolledAt={};
   u.enrolledAt[currentProgName]=Date.now();
-  users[session.email]=u;saveUsers(users);
+  users[session.email]=u; await saveUsers(users);
   updateEnrolledProgramDropdown();updateNavState();render();renderAccountPage();
   refreshProgModalButtons();
   showToast('Enrolled in '+currentProgName+'!','success');
@@ -2435,16 +2465,16 @@ function unenrollProgram(){
 function closeUnenrollModal(){
   document.getElementById('unenrollOverlay').classList.remove('open');
 }
-function confirmUnenroll(){
+async function confirmUnenroll(){
   const session=getSession();if(!session)return;
   closeUnenrollModal();
   const users=getUsers();const u=users[session.email];
   u.enrolledPrograms=(u.enrolledPrograms||[]).filter(p=>p!==currentProgName);
   u.program=u.enrolledPrograms[0]||'';
   const allLogs=getLogs(session.email).filter(l=>l.program!==currentProgName);
-  saveLogs(session.email,allLogs);
+  await saveLogs(session.email,allLogs);
   if(u.enrolledAt) delete u.enrolledAt[currentProgName];
-  users[session.email]=u;saveUsers(users);
+  users[session.email]=u; await saveUsers(users);
   updateEnrolledProgramDropdown();updateNavState();render();renderAccountPage();
   refreshProgModalButtons();
   showToast('Unenrolled from '+currentProgName+'. Progress deleted.');
@@ -2509,7 +2539,7 @@ function updateCompletionBar(done,total){
   document.getElementById('ex-completion-fill').style.width=pct+'%';
   document.getElementById('ex-completion-pct').textContent=pct+'%';
 }
-function skipDay(){
+async function skipDay(){
   const session=getSession();if(!session)return;
   const prog=getActiveProg();
   if(!prog){showToast('No active program.',false);return;}
@@ -2520,7 +2550,7 @@ function skipDay(){
   const existing=logs.find(l=>l.ts>=todayStart.getTime()&&l.program===prog&&!l.autoFail);
   // If there's an existing log (workout or skip), overwrite it with skip
   const filtered=logs.filter(l=>!(l.ts>=todayStart.getTime()&&l.program===prog&&!l.autoFail));
-  saveLogs(session.email,[...filtered,{ts:Date.now(),program:prog,duration:0,calories:0,mood:'⏭ Skipped',notes:'Day skipped.',exercises:[],completionPct:0,skipped:true}]);
+  await saveLogs(session.email,[...filtered,{ts:Date.now(),program:prog,duration:0,calories:0,mood:'⏭ Skipped',notes:'Day skipped.',exercises:[],completionPct:0,skipped:true}]);
   editingLogTs=null;
   render();showToast('Day skipped.');
 }
@@ -2532,7 +2562,7 @@ function getTodayLog(email,prog){
   return logs.find(l=>l.ts>=todayStart.getTime()&&l.program===prog&&!l.autoFail)||null;
 }
 
-function submitLog(e){
+async function submitLog(e){
   e.preventDefault();
   const session=getSession();if(!session)return;
   const prog=getActiveProg();
@@ -2567,13 +2597,12 @@ function submitLog(e){
     // Replace existing entry
     const idx=logs.findIndex(l=>l.ts===editingLogTs);
     if(idx>=0) logs[idx]=entry; else logs.push(entry);
-    saveLogs(session.email,logs);
+    await saveLogs(session.email,logs);
     editingLogTs=null;
   } else {
-    // Remove any existing log for today & this program before saving (avoid duplicates)
     const todayStart2=new Date();todayStart2.setHours(0,0,0,0);
     const filtered=logs.filter(l=>!(l.ts>=todayStart2.getTime()&&l.program===prog&&!l.autoFail));
-    saveLogs(session.email,[...filtered,entry]);
+    await saveLogs(session.email,[...filtered,entry]);
   }
 
   document.getElementById('f-notes').value='';
@@ -2702,9 +2731,9 @@ function render(){
   renderTodaysWorkoutCard();
 }
 
-function delLog(ts){
+async function delLog(ts){
   const session=getSession();if(!session)return;
-  saveLogs(session.email,getLogs(session.email).filter(l=>l.ts!==ts));render();
+  await saveLogs(session.email,getLogs(session.email).filter(l=>l.ts!==ts));render();
 }
 
 function renderWeekChart(){
@@ -3448,7 +3477,7 @@ function selectAccModalAvatar(el){
   document.querySelectorAll('#accModalAvatarPicker .av-opt').forEach(x=>x.classList.remove('selected'));
   el.classList.add('selected'); accModalAvatar=el.dataset.av;
 }
-function saveAccModalProfile(){
+async function saveAccModalProfile(){
   const session=getSession(); if(!session) return;
   const users=getUsers(); const u=users[session.email];
   const name=document.getElementById('accModalName').value.trim();
@@ -3457,12 +3486,10 @@ function saveAccModalProfile(){
   err.style.display='none';
   if(!name){err.textContent='Name cannot be empty.';err.style.display='block';return;}
   u.name=name; u.bio=bio; u.avatar=accModalAvatar;
-  users[session.email]=u; saveUsers(users);
+  users[session.email]=u; await saveUsers(users);
   updateNavState(); renderAccountPage(); showToast('Profile updated! ✓'); closeAccModal();
 }
-function saveAccModalPassword(){
-  const session=getSession(); if(!session) return;
-  const users=getUsers(); const u=users[session.email];
+async function saveAccModalPassword(){
   const np=document.getElementById('accModalNewPass').value;
   const cp=document.getElementById('accModalConfPass').value;
   const err=document.getElementById('accModalPassErr');
@@ -3470,26 +3497,40 @@ function saveAccModalPassword(){
   if(!np){err.textContent='Enter a new password.';err.style.display='block';return;}
   if(np.length<6){err.textContent='Password min 6 characters.';err.style.display='block';return;}
   if(np!==cp){err.textContent='Passwords do not match.';err.style.display='block';return;}
-  u.password=btoa(np); users[session.email]=u; saveUsers(users);
+  const {error}=await sb.auth.updateUser({password:np});
+  if(error){err.textContent=error.message;err.style.display='block';return;}
   showToast('Password updated! ✓'); closeAccModal();
 }
-function saveAccModalSettings(){
+async function saveAccModalSettings(){
   const session=getSession(); if(!session) return;
   const users=getUsers(); const u=users[session.email];
   u.goal=+document.getElementById('accModalGoal').value;
   u.cal=+document.getElementById('accModalCal').value;
   u.level=document.getElementById('accModalLevel').value;
-  users[session.email]=u; saveUsers(users);
+  users[session.email]=u; await saveUsers(users);
   updateNavState(); renderAccountPage(); showToast('Settings saved! ✓'); closeAccModal();
 }
-checkAutoFail();
-updateNavState();
-renderProgramCards();
-render();
-renderWeekIndicator();
-if(getSession())updateEnrolledProgramDropdown();
-renderHomeFolders();
-renderTodaysWorkoutCard();
+(async()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  if(session){
+    await loadUserData(session.user);
+  }
+  checkAutoFail();
+  updateNavState();
+  renderProgramCards();
+  render();
+  renderWeekIndicator();
+  if(getSession())updateEnrolledProgramDropdown();
+  renderHomeFolders();
+  renderTodaysWorkoutCard();
+})();
+
+sb.auth.onAuthStateChange(async(event,session)=>{
+  if(event==='SIGNED_OUT'){
+    _currentUser=null;_profile=null;_logs=[];
+    updateNavState();render();
+  }
+});
 </script>
 </body>
 </html>
