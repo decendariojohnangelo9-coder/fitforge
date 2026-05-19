@@ -1739,9 +1739,25 @@ function getLogs(email){ return _logs; }
 async function saveLogs(email, logsArray){
   if(!_currentUser) return;
   _logs = logsArray;
-  await sb.from('logs').delete().eq('user_id', _currentUser.id);
+  const { error } = await sb.from('logs').delete().eq('user_id', _currentUser.id);
   if(!logsArray.length) return;
-  await sb.from('logs').insert(logsArray.map(l=>({ user_id:_currentUser.id, ts:l.ts, program_name:l.program||'', workout_title:l.title||'', calories:l.calories||0, mood:l.mood||'', notes:l.notes||'', exercises:l.exercises||[], duration:l.duration||0, rest_day:l.restDay||false, skipped:l.skipped||false, auto_fail:l.autoFail||false, completion_pct:l.completionPct||0 })));
+  const rows = logsArray.map(l=>({
+    user_id: _currentUser.id,
+    ts: l.ts,
+    program_name: l.program||'',
+    workout_title: l.title||l.program||'',
+    calories: l.calories||0,
+    mood: 3,
+    notes: l.notes||'',
+    exercises: l.exercises||[],
+    duration: l.duration||0,
+    rest_day: l.restDay||false,
+    skipped: l.skipped||false,
+    auto_fail: l.autoFail||false,
+    completion_pct: l.completionPct||0
+  }));
+  const { error: insertError } = await sb.from('logs').insert(rows);
+  if(insertError) console.error('saveLogs error:', insertError);
 }
 async function loadUserData(user){
   _currentUser = user;
@@ -1749,7 +1765,7 @@ async function loadUserData(user){
   if(!profile){ const { data: np } = await sb.from('profiles').insert({ id:user.id, name:user.user_metadata?.name||user.email.split('@')[0] }).select().single(); profile = np; }
   _profile = profile || { id:user.id, name:'', enrolledPrograms:[], enrolledAt:{}, program:'' };
   const { data: logsData } = await sb.from('logs').select('*').eq('user_id', user.id).order('ts', { ascending:true });
-  _logs = (logsData||[]).map(l=>({ ts:l.ts, program:l.program_name, title:l.workout_title, calories:l.calories, mood:l.mood, notes:l.notes, exercises:l.exercises||[], duration:l.duration, restDay:l.rest_day, skipped:l.skipped, autoFail:l.auto_fail, completionPct:l.completion_pct }));
+  _logs = (logsData||[]).map(l=>({ ts:l.ts, program:l.program_name, title:l.workout_title, calories:l.calories||0, mood:l.mood_text||l.mood||'Okay', notes:l.notes||'', exercises:l.exercises||[], duration:l.duration||0, restDay:l.rest_day, skipped:l.skipped, autoFail:l.auto_fail, completionPct:l.completion_pct||0 }));
 }
 const saveSession = s => {};
 
