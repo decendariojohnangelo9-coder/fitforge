@@ -2381,7 +2381,7 @@ function renderProgramCards(){
 
   if(session && enrolled.length===0){
     const emptyBanner=`<div style="grid-column:1/-1;border:1px dashed rgba(225,19,44,.25);background:rgba(225,19,44,.04);padding:28px 24px;text-align:center;margin-bottom:4px">
-      <div style="font-size:2rem;margin-bottom:10px">🏋️</div>
+      
       <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:900;letter-spacing:1px;color:#fff;margin-bottom:6px">NO ACTIVE PROGRAM</div>
       <div style="font-size:12px;color:var(--muted);line-height:1.6">Pick a program below and hit <strong style="color:#fff">ENROLL IN PROGRAM</strong> to start your journey.</div>
     </div>`;
@@ -3113,7 +3113,7 @@ function renderTodaysWorkoutCard(){
   const session = getSession();
   if(!session){
     card.innerHTML = `<div class="todays-locked">
-      <div class="lock-icon">🔒</div>
+      
       <div class="lock-title">TODAY'S WORKOUT</div>
       <div class="lock-sub">Sign in to see your personalized daily workout</div>
       <div class="lock-btns">
@@ -3134,7 +3134,7 @@ function renderTodaysWorkoutCard(){
   // No program enrolled
   if(!prog){
     card.innerHTML = `<div class="todays-locked" style="background:linear-gradient(135deg,#0f0f0f,#1a1a1a)">
-      <div class="lock-icon" style="font-size:2rem">📋</div>
+      
       <div class="lock-title" style="font-size:1rem">NO PROGRAM ENROLLED</div>
       <div class="lock-sub">Pick a program to see your daily workout here</div>
       <div class="lock-btns">
