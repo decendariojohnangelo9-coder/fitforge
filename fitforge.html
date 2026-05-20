@@ -3196,19 +3196,19 @@ const HOME_CATEGORIES = [
   { tag:'lower body', label:'Lower Body',  img:'mga pics nigga lloyd/image.png' },
 ];
 
-// VIDEO DATABASE — add your .mp4 files in a "videos/" folder
-const HOME_VIDEO_DB = [
-  // Demo entry — replace with your actual videos
-  {
-    file:'https://www.w3schools.com/html/mov_bbb.mp4',
-    title:'DEMO: HOW TO ADD YOUR VIDEO',
-    tag:'full body',
-    desc:'Replace this with your own MP4 file in the videos/ folder.',
-    duration:'Demo'
-  },
-  // Add more like:
-  // { file:'pushup.mp4', title:'PERFECT PUSH-UP FORM', tag:'upper body', desc:'Master push-up technique.', duration:'12 min' },
-];
+let HOME_VIDEO_DB = [];
+async function loadVideos(){
+  const { data, error } = await sb.from('videos').select('*').order('category');
+  if(error){ console.error('loadVideos error:', error); return; }
+  HOME_VIDEO_DB = (data||[]).map(v=>({
+    file: v.cloudinary_url,
+    title: v.title,
+    tag: v.category,
+    desc: v.description||'',
+    duration: v.duration||''
+  }));
+  renderHomeFolders();
+}
 
 /* ═══════════════ VIDEO TUTORIAL SEARCH ═══════════════ */
 let tutSearchOpen = false;
@@ -3283,7 +3283,8 @@ function onTutSearch(){
 
 let homeExpandedCat = null;
 
-function renderHomeFolders(){
+async function renderHomeFolders(){
+  if(!HOME_VIDEO_DB.length) await loadVideos();
   const grid = document.getElementById('homeFolderGrid');
   if(!grid) return;
   grid.innerHTML = HOME_CATEGORIES.map(cat=>{
@@ -3537,7 +3538,7 @@ async function saveAccModalSettings(){
   render();
   renderWeekIndicator();
   if(getSession())updateEnrolledProgramDropdown();
-  renderHomeFolders();
+  await loadVideos();
   renderTodaysWorkoutCard();
 })();
 
