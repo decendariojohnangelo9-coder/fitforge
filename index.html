@@ -33,6 +33,33 @@ button{font-family:inherit;cursor:pointer}
 .page.active{display:block}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
+/* ══ LEGAL MODAL ══ */
+.legal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(6px);z-index:9998;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.legal-overlay.open{opacity:1;pointer-events:all}
+.legal-box{width:100%;max-width:680px;max-height:85vh;background:#0e0e0e;border:1px solid rgba(255,255,255,.08);border-top:3px solid var(--red);display:flex;flex-direction:column;margin:16px}
+.legal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.legal-header h3{font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:900;letter-spacing:2px;color:#fff}
+.legal-close{background:none;border:1px solid rgba(255,255,255,.12);color:#888;width:30px;height:30px;border-radius:50%;font-size:14px;cursor:pointer;transition:.2s}
+.legal-close:hover{color:#fff;border-color:rgba(255,255,255,.35)}
+.legal-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.legal-tab{flex:1;padding:12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;background:none;border:none;color:#666;cursor:pointer;transition:.2s;border-bottom:2px solid transparent}
+.legal-tab.active{color:#fff;border-bottom-color:var(--red)}
+.legal-body{overflow-y:auto;padding:24px;flex:1;scrollbar-width:thin;scrollbar-color:#333 transparent}
+.legal-body h4{font-family:'Barlow Condensed',sans-serif;font-size:.85rem;font-weight:900;letter-spacing:1.5px;color:var(--red);margin:20px 0 8px;text-transform:uppercase}
+.legal-body h4:first-child{margin-top:0}
+.legal-body p{font-size:12px;color:#aaa;line-height:1.75;margin-bottom:10px}
+.legal-body ul{padding-left:16px;margin-bottom:10px}
+.legal-body ul li{font-size:12px;color:#aaa;line-height:1.75;margin-bottom:4px}
+.legal-footer-links{display:flex;gap:16px;align-items:center;justify-content:center;flex-wrap:wrap}
+.legal-link{font-size:10px;color:#555;letter-spacing:1px;cursor:pointer;transition:.2s;text-decoration:underline;text-underline-offset:3px}
+.legal-link:hover{color:#aaa}
+/* Signup checkbox */
+.auth-agree{display:flex;align-items:flex-start;gap:10px;margin:12px 0 4px}
+.auth-agree input[type=checkbox]{width:15px;height:15px;min-width:15px;margin-top:2px;accent-color:var(--red);cursor:pointer}
+.auth-agree label{font-size:11px;color:#888;line-height:1.6;cursor:pointer}
+.auth-agree label span{color:var(--red);text-decoration:underline;cursor:pointer}
+.auth-agree label span:hover{color:#fff}
+
 /* ══ LEFT PROFILE SIDEBAR ══ */
 .profile-sidebar{
   position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;
@@ -1209,6 +1236,10 @@ nav a.active{color:var(--red)}
       <div class="auth-field"><label>FULL NAME</label><input type="text" id="s-name" placeholder="Your name"/></div>
       <div class="auth-field"><label>EMAIL</label><input type="email" id="s-email" placeholder="you@example.com"/></div>
       <div class="auth-field"><label>PASSWORD</label><div class="pw-wrap"><input type="password" id="s-pass" placeholder="Min. 6 characters"/><button type="button" class="pw-toggle" onclick="togglePw('s-pass',this)" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+      <div class="auth-agree">
+        <input type="checkbox" id="agreeTerms"/>
+        <label for="agreeTerms">I agree to the <span onclick="openLegal('terms')">Terms & Conditions</span> and <span onclick="openLegal('privacy')">Privacy Policy</span> of FitForge.</label>
+      </div>
       <button class="auth-submit" onclick="doSignup()">CREATE ACCOUNT</button>
       <div class="auth-error" id="signupErr"></div>
       <p class="auth-sub">Already have an account? <span onclick="switchTab('login')">Log in</span></p>
@@ -1466,7 +1497,7 @@ nav a.active{color:var(--red)}
     </div>
   </section>
 
-  <footer style="padding:32px 5%;border-top:1px solid var(--border);text-align:center;color:var(--muted);font-size:11px;letter-spacing:2px">© FITFORGE — TRAIN SMARTER. PUSH HARDER.</footer>
+  <footer style="padding:28px 5%;border-top:1px solid var(--border);text-align:center"><div style="color:var(--muted);font-size:11px;letter-spacing:2px;margin-bottom:12px">© FITFORGE — TRAIN SMARTER. PUSH HARDER.</div><div class="legal-footer-links"><span class="legal-link" onclick="openLegal('terms')">TERMS &amp; CONDITIONS</span><span style="color:#333;font-size:10px">·</span><span class="legal-link" onclick="openLegal('privacy')">PRIVACY POLICY</span></div></footer>
 </div>
 
 <!-- ═════════════════════════
@@ -1496,7 +1527,7 @@ nav a.active{color:var(--red)}
     </div>
     <div class="programs-grid" id="programs-grid"></div>
   </div>
-  <footer style="padding:32px 5%;border-top:1px solid var(--border);text-align:center;color:var(--muted);font-size:11px;letter-spacing:2px">© FITFORGE — TRAIN SMARTER. PUSH HARDER.</footer>
+  <footer style="padding:28px 5%;border-top:1px solid var(--border);text-align:center"><div style="color:var(--muted);font-size:11px;letter-spacing:2px;margin-bottom:12px">© FITFORGE — TRAIN SMARTER. PUSH HARDER.</div><div class="legal-footer-links"><span class="legal-link" onclick="openLegal('terms')">TERMS &amp; CONDITIONS</span><span style="color:#333;font-size:10px">·</span><span class="legal-link" onclick="openLegal('privacy')">PRIVACY POLICY</span></div></footer>
 </div>
 
 <!-- ═════════════════════════
@@ -1581,7 +1612,7 @@ nav a.active{color:var(--red)}
       </div>
     </div>
   </div>
-  <footer style="padding:32px 5%;border-top:1px solid var(--border);text-align:center;color:var(--muted);font-size:11px;letter-spacing:2px">© FITFORGE — TRAIN SMARTER. PUSH HARDER.</footer>
+  <footer style="padding:28px 5%;border-top:1px solid var(--border);text-align:center"><div style="color:var(--muted);font-size:11px;letter-spacing:2px;margin-bottom:12px">© FITFORGE — TRAIN SMARTER. PUSH HARDER.</div><div class="legal-footer-links"><span class="legal-link" onclick="openLegal('terms')">TERMS &amp; CONDITIONS</span><span style="color:#333;font-size:10px">·</span><span class="legal-link" onclick="openLegal('privacy')">PRIVACY POLICY</span></div></footer>
 </div>
 
 <!-- ═════════════════════════
@@ -1681,7 +1712,7 @@ nav a.active{color:var(--red)}
     </div>
 
   </div>
-  <footer style="padding:32px 5%;border-top:1px solid var(--border);text-align:center;color:var(--muted);font-size:11px;letter-spacing:2px">© FITFORGE — TRAIN SMARTER. PUSH HARDER.</footer>
+  <footer style="padding:28px 5%;border-top:1px solid var(--border);text-align:center"><div style="color:var(--muted);font-size:11px;letter-spacing:2px;margin-bottom:12px">© FITFORGE — TRAIN SMARTER. PUSH HARDER.</div><div class="legal-footer-links"><span class="legal-link" onclick="openLegal('terms')">TERMS &amp; CONDITIONS</span><span style="color:#333;font-size:10px">·</span><span class="legal-link" onclick="openLegal('privacy')">PRIVACY POLICY</span></div></footer>
 </div>
 
 <!-- ══ ACCOUNT MODALS ══ -->
@@ -2002,6 +2033,7 @@ async function doSignup(){
   if(!name||!email||!pass)return showError('signupErr','Please fill in all fields.');
   if(pass.length<6)return showError('signupErr','Password must be at least 6 characters.');
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))return showError('signupErr','Enter a valid email address.');
+  if(!document.getElementById('agreeTerms').checked)return showError('signupErr','Please agree to the Terms & Conditions and Privacy Policy.');
   const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{name}}});
   if(error)return showError('signupErr',error.message);
   await loadUserData(data.user);
@@ -3549,5 +3581,131 @@ sb.auth.onAuthStateChange(async(event,session)=>{
   }
 });
 </script>
+<!-- ══ LEGAL MODAL ══ -->
+<div class="legal-overlay" id="legalOverlay" onclick="e=>{if(e.target===this)closeLegal()}">
+  <div class="legal-box">
+    <div class="legal-header">
+      <h3 id="legalTitle">TERMS & CONDITIONS</h3>
+      <button class="legal-close" onclick="closeLegal()">✕</button>
+    </div>
+    <div class="legal-tabs">
+      <button class="legal-tab active" id="legalTabTerms" onclick="switchLegal('terms')">TERMS & CONDITIONS</button>
+      <button class="legal-tab" id="legalTabPrivacy" onclick="switchLegal('privacy')">PRIVACY POLICY</button>
+    </div>
+    <div class="legal-body" id="legalBody"></div>
+  </div>
+</div>
+
+<script>
+const LEGAL_CONTENT = {
+  terms: `
+    <h4>1. Acceptance of Terms</h4>
+    <p>By creating an account or using FitForge, you agree to be bound by these Terms & Conditions. If you do not agree, please do not use the platform.</p>
+
+    <h4>2. Use of the Platform</h4>
+    <p>FitForge is a fitness tracking and workout guidance platform. You agree to use it only for lawful, personal, non-commercial purposes. You must not:</p>
+    <ul>
+      <li>Share your account credentials with others</li>
+      <li>Attempt to reverse-engineer or compromise the platform</li>
+      <li>Use the platform in any way that could harm other users</li>
+      <li>Submit false or misleading information</li>
+    </ul>
+
+    <h4>3. Fitness & Health Disclaimer</h4>
+    <p>FitForge provides general fitness information and workout programs for educational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider before starting any new exercise program, especially if you have pre-existing medical conditions.</p>
+    <p>You assume full responsibility for any injury, health issue, or other consequence arising from following workouts or advice provided on this platform.</p>
+
+    <h4>4. User Accounts</h4>
+    <p>You are responsible for maintaining the confidentiality of your account and password. You agree to notify us immediately of any unauthorized use of your account. FitForge is not liable for any loss resulting from unauthorized access to your account.</p>
+
+    <h4>5. Workout Data & Logs</h4>
+    <p>All workout logs, progress data, and session history you create are stored securely and are associated with your account. You may delete your data at any time by unenrolling from programs or contacting support.</p>
+
+    <h4>6. Intellectual Property</h4>
+    <p>All content on FitForge — including workout programs, designs, text, and graphics — is the property of FitForge and protected by applicable intellectual property laws. You may not reproduce or distribute any content without explicit permission.</p>
+
+    <h4>7. Termination</h4>
+    <p>We reserve the right to suspend or terminate your account at any time if you violate these terms. You may also delete your account at any time through account settings.</p>
+
+    <h4>8. Changes to Terms</h4>
+    <p>FitForge reserves the right to update these Terms & Conditions at any time. Continued use of the platform after changes constitutes acceptance of the new terms.</p>
+
+    <h4>9. Contact</h4>
+    <p>For any questions regarding these terms, please contact us through the FitForge platform.</p>
+  `,
+  privacy: `
+    <h4>1. Information We Collect</h4>
+    <p>When you use FitForge, we collect the following information:</p>
+    <ul>
+      <li><strong>Account information</strong> — name, email address, and password (encrypted)</li>
+      <li><strong>Profile data</strong> — fitness level, weekly goals, calorie targets, avatar, and bio</li>
+      <li><strong>Workout data</strong> — session logs, exercise completions, duration, calories burned, mood ratings, and notes</li>
+      <li><strong>Program data</strong> — enrolled programs and enrollment dates</li>
+    </ul>
+
+    <h4>2. How We Use Your Information</h4>
+    <p>We use your information to:</p>
+    <ul>
+      <li>Provide and personalize your FitForge experience</li>
+      <li>Track and display your workout progress and statistics</li>
+      <li>Maintain your account and session security</li>
+      <li>Improve the platform based on usage patterns</li>
+    </ul>
+
+    <h4>3. Data Storage & Security</h4>
+    <p>Your data is stored securely using Supabase, a trusted cloud database provider. All data is encrypted in transit using HTTPS. Passwords are never stored in plain text — they are handled by Supabase Auth with industry-standard encryption.</p>
+
+    <h4>4. Data Sharing</h4>
+    <p>We do not sell, trade, or share your personal information with third parties for marketing purposes. Your data may only be shared with:</p>
+    <ul>
+      <li>Supabase (database and authentication provider)</li>
+      <li>Cloudinary (video content delivery)</li>
+      <li>Law enforcement if required by applicable law</li>
+    </ul>
+
+    <h4>5. Cookies & Local Storage</h4>
+    <p>FitForge uses browser session tokens provided by Supabase Auth to keep you logged in. These are standard, secure authentication tokens and do not track your activity across other websites.</p>
+
+    <h4>6. Your Rights</h4>
+    <p>You have the right to:</p>
+    <ul>
+      <li>Access the personal data we hold about you</li>
+      <li>Request correction of inaccurate data</li>
+      <li>Request deletion of your account and associated data</li>
+      <li>Unenroll from programs to delete your workout history</li>
+    </ul>
+
+    <h4>7. Data Retention</h4>
+    <p>We retain your data for as long as your account is active. If you delete your account, your personal data will be removed from our systems within a reasonable timeframe.</p>
+
+    <h4>8. Children's Privacy</h4>
+    <p>FitForge is not intended for users under the age of 13. We do not knowingly collect personal information from children. If you believe a child has provided us with personal information, please contact us immediately.</p>
+
+    <h4>9. Changes to This Policy</h4>
+    <p>We may update this Privacy Policy from time to time. We will notify users of significant changes through the platform. Continued use of FitForge after changes constitutes acceptance of the updated policy.</p>
+
+    <h4>10. Contact</h4>
+    <p>If you have any questions about this Privacy Policy or how your data is handled, please contact us through the FitForge platform.</p>
+  `
+};
+
+function openLegal(tab='terms'){
+  document.getElementById('legalOverlay').classList.add('open');
+  switchLegal(tab);
+}
+function closeLegal(){
+  document.getElementById('legalOverlay').classList.remove('open');
+}
+function switchLegal(tab){
+  document.getElementById('legalTabTerms').classList.toggle('active', tab==='terms');
+  document.getElementById('legalTabPrivacy').classList.toggle('active', tab==='privacy');
+  document.getElementById('legalTitle').textContent = tab==='terms' ? 'TERMS & CONDITIONS' : 'PRIVACY POLICY';
+  document.getElementById('legalBody').innerHTML = LEGAL_CONTENT[tab];
+}
+document.getElementById('legalOverlay').addEventListener('click', function(e){
+  if(e.target === this) closeLegal();
+});
+</script>
+
 </body>
 </html>
