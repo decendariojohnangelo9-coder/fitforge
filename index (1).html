@@ -2103,15 +2103,19 @@ function updateNavState(){
     }
     document.getElementById('sbCalories').textContent=week.reduce((s,l)=>s+ +l.calories,0);
     // sidebar recent logs
-    const logs=getLogs(session.email).sort((a,b)=>b.ts-a.ts).slice(0,3);
-    document.getElementById('sbRecentLogs').innerHTML=logs.length?logs.map(l=>`
-      <div class="sb-recent-item">
-        <div class="sb-ri-icon" style="background:rgba(225,19,44,.15);border:1px solid rgba(225,19,44,.3);font-size:9px;font-weight:700;letter-spacing:1px;color:var(--red);font-family:'Barlow Condensed',sans-serif">LOG</div>
+    const logs=getLogs(session.email).slice().sort((a,b)=>b.ts-a.ts).slice(0,3);
+    document.getElementById('sbRecentLogs').innerHTML=logs.length?logs.map(l=>{
+      const isRest=l.restDay;const isMissed=l.autoFail;const isSkipped=l.skipped;
+      const badgeStyle=isRest?'background:rgba(100,180,255,.15);border:1px solid rgba(100,180,255,.35);color:#64b4ff':isMissed?'background:rgba(225,19,44,.15);border:1px solid rgba(225,19,44,.3);color:var(--red)':isSkipped?'background:rgba(160,160,160,.15);border:1px solid rgba(160,160,160,.3);color:#aaa':'background:rgba(225,19,44,.15);border:1px solid rgba(225,19,44,.3);color:var(--red)';
+      const badgeText=isRest?'REST':isMissed?'MISS':isSkipped?'SKIP':'LOG';
+      const info=isRest?'Recovering':(isMissed?'Missed':(isSkipped?'Skipped':`${l.duration} min · ${l.calories} cal · ${l.mood}`));
+      return `<div class="sb-recent-item">
+        <div class="sb-ri-icon" style="${badgeStyle};font-size:9px;font-weight:700;letter-spacing:1px;font-family:'Barlow Condensed',sans-serif">${badgeText}</div>
         <div class="sb-ri-info">
           <strong>${l.program}</strong>
-          <p>${l.duration} min · ${l.calories} cal · ${l.mood}</p>
+          <p>${info}</p>
         </div>
-      </div>`).join(''):'<p style="color:var(--muted);font-size:13px">No sessions yet.</p>';
+      </div>`;}).join(''):'<p style="color:var(--muted);font-size:13px">No sessions yet.</p>';
     // active program
     const ap=PROGRAMS.find(x=>x.name===u.program);
     document.getElementById('sbActiveProg').innerHTML=ap
@@ -2750,10 +2754,10 @@ function unlockForm(){
 
 function render(){
   const session=getSession();if(!session)return;
-  // All logs (no autoFail) — used for weekly summary stats
-  const allLogs=getLogs(session.email).filter(l=>!l.autoFail);
-  // Only last 3 for display list
-  const logs=allLogs.sort((a,b)=>b.ts-a.ts).slice(0,3);
+  // All logs including autoFail/missed — used for session history display
+  const allLogs=getLogs(session.email);
+  // Only last 3 for display list (includes missed/rest auto logs)
+  const logs=allLogs.slice().sort((a,b)=>b.ts-a.ts).slice(0,3);
   const list=document.getElementById('log-list');
   if(!logs.length){list.innerHTML='<div class="empty">No sessions yet. Log your first one!</div>';}
   else{
@@ -2767,9 +2771,9 @@ function render(){
         </div>
       </div>`;}).join('');
   }
-  // Weekly stats use ALL logs, not just the 3 displayed
+  // Weekly stats use real logs only (no autoFail/missed), not just the 3 displayed
   const _n=new Date();const _m=new Date(_n);_m.setDate(_n.getDate()-((_n.getDay()+6)%7));_m.setHours(0,0,0,0);
-  const week=allLogs.filter(l=>l.ts>=_m.getTime());
+  const week=allLogs.filter(l=>l.ts>=_m.getTime()&&!l.autoFail);
   document.getElementById('s-sessions').textContent=week.filter(l=>!l.restDay&&!l.skipped).length;
   document.getElementById('s-minutes').textContent=week.reduce((s,l)=>s+ +l.duration,0);
   document.getElementById('s-calories').textContent=week.reduce((s,l)=>s+ +l.calories,0);
@@ -2952,7 +2956,14 @@ function openWeekPopup(){
     const completed=weekLogs.filter(l=>!l.restDay&&!l.skipped).length;
     const missed=autoFails.length;
     const skipped=weekLogs.filter(l=>l.skipped).length;
-    const restDays=weekLogs.filter(l=>l.restDay).length;
+    const now2=new Date();
+    const wdIdx2=getWorkoutDayIndices(prog);
+    const restDays=[0,1,2,3,4,5,6].filter(dayIdx=>{
+      if(wdIdx2.includes(dayIdx))return false;
+      const dayDate=new Date(weekStart.getTime()+dayIdx*24*60*60*1000);
+      dayDate.setHours(23,59,59,999);
+      return dayDate.getTime()<=now2.getTime();
+    }).length;
     const isPast=w<currentWeek;
     const isCurrent=w===currentWeek;
     const isFuture=w>currentWeek;
@@ -3077,16 +3088,25 @@ function checkAutoFail(){
     // Don't run autoFail if enrolled today
     const todayMidnight=new Date();todayMidnight.setHours(0,0,0,0);
     if(enrollDay>=todayMidnight) return;
-    for(let offset=1;offset<=7;offset++){
+    for(let offset=0;offset<=7;offset++){
       const d=new Date(now);d.setDate(now.getDate()-offset);d.setHours(12,0,0,0);
       const dIdx=(d.getDay()+6)%7;
-      if(!wdIdx.includes(dIdx))continue;
       const dayStart=new Date(d);dayStart.setHours(0,0,0,0);
       const dayEnd=new Date(d);dayEnd.setHours(23,59,59,999);
       // Skip days before or on enrollment date
       if(dayStart<=enrollDay)continue;
-      const hasLog=logs.some(l=>l.ts>=dayStart.getTime()&&l.ts<=dayEnd.getTime()&&l.program===progName);
-      if(!hasLog){saveLogs(session.email,[...getLogs(session.email),{ts:dayStart.getTime()+1,program:progName,duration:0,calories:0,mood:'❌ Missed',notes:'Session not logged — recorded as missed.',exercises:[],completionPct:0,autoFail:true}]);}
+      const isToday=offset===0;
+      // Refresh logs each iteration to avoid duplicates from entries just saved
+      const currentLogs=getLogs(session.email);
+      const hasLog=currentLogs.some(l=>l.ts>=dayStart.getTime()&&l.ts<=dayEnd.getTime()&&l.program===progName);
+      if(hasLog)continue;
+      if(!wdIdx.includes(dIdx)){
+        // Rest day — auto-log a rest entry (including today)
+        saveLogs(session.email,[...getLogs(session.email),{ts:dayStart.getTime()+2,program:progName,duration:0,calories:0,mood:'Rest and recovering',notes:'Recovering',exercises:[],completionPct:0,restDay:true,skipped:false,autoFail:false}]);
+      } else if(!isToday){
+        // Missed workout day — only log if the day is already over (not today)
+        saveLogs(session.email,[...getLogs(session.email),{ts:dayStart.getTime()+1,program:progName,duration:0,calories:0,mood:'❌ Missed',notes:'Session not logged — recorded as missed.',exercises:[],completionPct:0,autoFail:true}]);
+      }
     }
   });
 }
